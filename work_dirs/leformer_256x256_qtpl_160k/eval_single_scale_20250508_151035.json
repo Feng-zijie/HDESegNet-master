@@ -1,0 +1,21 @@
+{
+    "config": "local_configs/leformer/leformer_256x256_qtpl_160k.py",
+    "metric": {
+        "aAcc": 0.6054999999999999,
+        "mIoU": 0.30269999999999997,
+        "mAcc": 0.5,
+        "mFscore": 0.7543000000000001,
+        "mPrecision": 0.6054999999999999,
+        "mRecall": 0.5,
+        "IoU.background": 0.6054999923706055,
+        "IoU.lake": 0.0,
+        "Acc.background": 1.0,
+        "Acc.lake": 0.0,
+        "Fscore.background": 0.7543000030517578,
+        "Fscore.lake": NaN,
+        "Precision.background": 0.6054999923706055,
+        "Precision.lake": NaN,
+        "Recall.background": 1.0,
+        "Recall.lake": 0.0
+    }
+}

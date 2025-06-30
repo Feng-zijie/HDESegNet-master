@@ -1,0 +1,21 @@
+{
+    "config": "local_configs/leformer/leformer_256x256_sw_160k.py",
+    "metric": {
+        "aAcc": 0.9527,
+        "mIoU": 0.9031,
+        "mAcc": 0.9531999999999999,
+        "mFscore": 0.9489,
+        "mPrecision": 0.9451999999999999,
+        "mRecall": 0.9531999999999999,
+        "IoU.background": 0.9281999969482422,
+        "IoU.lake": 0.8780999755859376,
+        "Acc.background": 0.9513999938964843,
+        "Acc.lake": 0.955,
+        "Fscore.background": 0.9627999877929687,
+        "Fscore.lake": 0.9351000213623046,
+        "Precision.background": 0.9744000244140625,
+        "Precision.lake": 0.9158999633789062,
+        "Recall.background": 0.9513999938964843,
+        "Recall.lake": 0.955
+    }
+}
