@@ -14,7 +14,7 @@ from mmcv.runner import get_dist_info, init_dist
 from mmcv.utils import Config, DictAction, get_git_hash
 
 import sys
-sys.path.append('/home/wangzhecheng/Fengzijie/LEFormer-master')
+sys.path.append('/home/wangzhecheng/Fengzijie/HDESegNet-master')
 from mmseg import __version__
 from mmseg.apis import init_random_seed, set_random_seed, train_segmentor
 from mmseg.datasets import build_dataset
@@ -45,7 +45,7 @@ def parse_args():
     group_gpus.add_argument(
         '--gpu-ids',
         type=int,
-        default=[7],
+        default=[1],
         nargs='+',
         help='(Deprecated, please use --gpu-id) ids of gpus to use '
              '(only applicable to non-distributed training)')

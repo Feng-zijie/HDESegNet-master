@@ -1,5 +1,4 @@
 # model settings
-# model settings
 norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     type='EncoderDecoder',
@@ -29,7 +28,7 @@ model = dict(
         in_index=[0, 1, 2, 3],
         channels=192,
         dropout_ratio=0.1,
-        num_classes=2,
+        num_classes=3,
         norm_cfg=norm_cfg,
         align_corners=False,
 
@@ -40,4 +39,12 @@ model = dict(
 
     # model training and testing settings
     train_cfg=dict(),
-    test_cfg=dict(mode='whole'))
+    test_cfg=dict(mode='whole'),
+    
+    # 滑动窗口推理配置（关键修改）
+    # test_cfg=dict(
+    #     mode='slide',
+    #     crop_size=(512, 512),     # 与数据配置中crop_size一致
+    #     stride=(341, 341)         # 推荐2/3重叠
+    # )
+)

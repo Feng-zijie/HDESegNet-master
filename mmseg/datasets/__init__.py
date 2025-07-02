@@ -23,6 +23,7 @@ from .stare import STAREDataset
 from .voc import PascalVOCDataset
 from .qtpl import QTPLDataset
 from .surface_water import SurfaceWaterDataset
+from .sjy import SJYDataset
 
 __all__ = [
     'CustomDataset', 'build_dataloader', 'ConcatDataset', 'RepeatDataset',
@@ -33,5 +34,5 @@ __all__ = [
     'COCOStuffDataset', 'LoveDADataset', 'MultiImageMixDataset',
     'iSAIDDataset', 'ISPRSDataset', 'PotsdamDataset', 'FaceOccludedDataset',
     'ImageNetSDataset', 'LoadImageNetSAnnotations',
-    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SurfaceWaterDataset'
+    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SurfaceWaterDataset','SJYDataset'
 ]
