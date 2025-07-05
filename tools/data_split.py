@@ -113,6 +113,9 @@ def main():
                 num_training += 1
             index += 1
     else:
+        def match_color(img, color, tolerance=10):
+            return np.all(np.abs(img.astype(int) - color.reshape(1, 1, 3)) <= tolerance, axis=-1)
+
         # 创建输出目录（新增三值掩码目录）
         training_dirs = [
             f"{save_path}/images/training",
@@ -120,94 +123,76 @@ def main():
             f"{save_path}/binary_annotations/training/background",
             f"{save_path}/binary_annotations/training/lake",
             f"{save_path}/binary_annotations/training/river",
-            f"{save_path}/ternary_annotations/training"  # 新增三值掩码目录
+            f"{save_path}/ternary_annotations/training"
         ]
-
         validation_dirs = [
             f"{save_path}/images/validation",
             f"{save_path}/annotations/validation",
             f"{save_path}/binary_annotations/validation/background",
             f"{save_path}/binary_annotations/validation/lake",
             f"{save_path}/binary_annotations/validation/river",
-            f"{save_path}/ternary_annotations/validation"  # 新增三值掩码目录
+            f"{save_path}/ternary_annotations/validation"
         ]
-
         for dir_path in training_dirs + validation_dirs:
             os.makedirs(dir_path, exist_ok=True)
 
-        # 定义类别颜色映射和类别索引
+        # 定义颜色映射
         COLOR_MAP = {
             'background': {'color': np.array([0, 0, 0]), 'index': 0},
             'lake': {'color': np.array([128, 0, 0]), 'index': 1},
-            'river': {'color': np.array([0, 127, 191]), 'index': 2}
+            'river': {'color': np.array([0, 127, 190]), 'index': 2}
         }
 
-        # 遍历所有图像
-        image_files = sorted(os.listdir(dataset_img_path))
+        image_files = sorted([
+            f for f in os.listdir(dataset_img_path)
+            if f.lower().endswith(('.jpg', '.png', '.jpeg'))
+        ])
+
         for index, file_name in enumerate(tqdm(image_files)):
-            if not file_name.lower().endswith(('.png', '.jpg', '.jpeg')):
-                continue
-                
-            # 读取图像和标签
             image_path = os.path.join(dataset_img_path, file_name)
             label_path = os.path.join(dataset_label_path, file_name)
-            
+
             if not os.path.exists(label_path):
                 print(f"警告: 找不到标签文件 {label_path}，跳过")
                 continue
-                
-            image = cv2.imread(image_path)
-            label = cv2.imread(label_path)
-            
+
+            image = cv2.imread(image_path, cv2.IMREAD_COLOR)
+            label = cv2.imread(label_path, cv2.IMREAD_COLOR)
+
             if image is None or label is None:
                 print(f"警告: 无法读取图像或标签 {file_name}，跳过")
                 continue
-                
-            # 转换BGR到RGB
+
             image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
             label = cv2.cvtColor(label, cv2.COLOR_BGR2RGB)
-            
-            # 生成三通道二值掩码
+
             h, w = label.shape[:2]
             binary_masks = {
                 'background': np.zeros((h, w), dtype=np.uint8),
                 'lake': np.zeros((h, w), dtype=np.uint8),
                 'river': np.zeros((h, w), dtype=np.uint8)
             }
-            
-            # 生成三值掩码（初始化为背景0）
             ternary_mask = np.zeros((h, w), dtype=np.uint8)
-            
-            # 为每个类别创建二值掩码，并生成三值掩码
+
             for class_name, info in COLOR_MAP.items():
                 color = info['color']
                 class_index = info['index']
-                # 找到匹配颜色的像素
-                mask = np.all(label == color, axis=-1)
+                mask = match_color(label, color, tolerance=10)
                 binary_masks[class_name][mask] = 255
-                # 将类别索引赋值给三值掩码
                 ternary_mask[mask] = class_index
-            
-            # 判断是训练集还是验证集
+
             is_validation = index in random_set
-            
-            # 构建保存路径
             prefix = f"val_{num_validation}" if is_validation else f"training_{num_training}"
             base_dirs = validation_dirs if is_validation else training_dirs
-            
-            # 保存图像和标签
+
             cv2.imwrite(os.path.join(base_dirs[0], f"{prefix}.jpg"), cv2.cvtColor(image, cv2.COLOR_RGB2BGR))
-            cv2.imwrite(os.path.join(base_dirs[1], f"{prefix}.png"), cv2.cvtColor(label, cv2.COLOR_RGB2BGR))
-            
-            # 保存三通道二值掩码
+            cv2.imwrite(os.path.join(base_dirs[1], f"{prefix}.png"), cv2.cvtColor(label, cv2.COLOR_RGB2BGR), [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
             for i, class_name in enumerate(['background', 'lake', 'river']):
-                cv2.imwrite(os.path.join(base_dirs[i+2], f"{prefix}.png"), binary_masks[class_name])
-            
-            # 保存三值掩码（新增）
-            ternary_dir = base_dirs[5]  # 三值掩码目录索引为5
-            cv2.imwrite(os.path.join(ternary_dir, f"{prefix}.png"), ternary_mask)
-            
-            # 更新计数器
+                cv2.imwrite(os.path.join(base_dirs[i+2], f"{prefix}.png"), binary_masks[class_name], [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
+            cv2.imwrite(os.path.join(base_dirs[5], f"{prefix}.png"), ternary_mask, [cv2.IMWRITE_PNG_COMPRESSION, 0])
+
             if is_validation:
                 num_validation += 1
             else:

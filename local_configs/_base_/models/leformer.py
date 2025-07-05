@@ -33,18 +33,23 @@ model = dict(
         align_corners=False,
 
         # 原始损失函数
-        loss_decode=dict(type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)
+        loss_decode=dict(
+            type='CrossEntropyLoss', 
+            use_sigmoid=False, 
+            loss_weight=1.0,
+            class_weight=[1.0, 1.0, 5.0]  # 让模型更关注 river 类
+            )
 
     ),
 
     # model training and testing settings
     train_cfg=dict(),
-    test_cfg=dict(mode='whole'),
+    # test_cfg=dict(mode='whole'), # 我用滑动窗口替代它了
     
     # 滑动窗口推理配置（关键修改）
-    # test_cfg=dict(
-    #     mode='slide',
-    #     crop_size=(512, 512),     # 与数据配置中crop_size一致
-    #     stride=(341, 341)         # 推荐2/3重叠
-    # )
+    test_cfg=dict(
+        mode='slide',
+        crop_size=(416, 416),     # 与数据配置中crop_size一致
+        stride=(256, 256)         # 推荐2/3重叠
+    )
 )

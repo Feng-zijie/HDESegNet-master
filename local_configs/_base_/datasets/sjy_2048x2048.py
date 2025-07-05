@@ -1,6 +1,6 @@
 # dataset settings
 dataset_type = 'SJYDataset'
-data_root = '/home/wangzhecheng/Fengzijie/dataset_splited_SJY2'
+data_root = '/home/wangzhecheng/Fengzijie/dataset_splited_SJY_tolerance=15'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (416,416)
@@ -25,7 +25,6 @@ test_pipeline = [
         flip=False,
         transforms=[
             dict(type='Resize', keep_ratio=True),
-            # dict(type='ResizeToMultiple', size_divisor=32),
             dict(type='RandomFlip'),
             dict(type='Normalize', **img_norm_cfg),
             dict(type='ImageToTensor', keys=['img']),

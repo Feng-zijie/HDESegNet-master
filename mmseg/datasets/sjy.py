@@ -11,4 +11,5 @@ class SJYDataset(CustomDataset):
         super(SJYDataset, self).__init__(
             img_suffix='.jpg',
             seg_map_suffix='.png',
+            reduce_zero_label=False,
             **kwargs)

@@ -26,11 +26,14 @@ model = dict(
         norm_cfg=dict(type='SyncBN', requires_grad=True),
         align_corners=False,
         loss_decode=dict(
-            type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
+            type='CrossEntropyLoss',
+            use_sigmoid=False,
+            loss_weight=1.0,
+            class_weight=[1.0, 1.0, 5.0])),
     train_cfg=dict(),
-    test_cfg=dict(mode='whole'))
+    test_cfg=dict(mode='slide', crop_size=(416, 416), stride=(256, 256)))
 dataset_type = 'SJYDataset'
-data_root = '/home/wangzhecheng/Fengzijie/dataset_splited_SJY2'
+data_root = '/home/wangzhecheng/Fengzijie/dataset_splited_SJY4'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (416, 416)
@@ -76,7 +79,7 @@ data = dict(
         times=50,
         dataset=dict(
             type='SJYDataset',
-            data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY2',
+            data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY4',
             img_dir='images/training',
             ann_dir='ternary_annotations/training',
             pipeline=[
@@ -103,7 +106,7 @@ data = dict(
             ])),
     val=dict(
         type='SJYDataset',
-        data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY2',
+        data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY4',
         img_dir='images/validation',
         ann_dir='ternary_annotations/validation',
         pipeline=[
@@ -126,7 +129,7 @@ data = dict(
         ]),
     test=dict(
         type='SJYDataset',
-        data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY2',
+        data_root='/home/wangzhecheng/Fengzijie/dataset_splited_SJY4',
         img_dir='images/validation',
         ann_dir='ternary_annotations/validation',
         pipeline=[
@@ -174,9 +177,9 @@ lr_config = dict(
     power=1.0,
     min_lr=0.0,
     by_epoch=False)
-runner = dict(type='IterBasedRunner', max_iters=240000)
-checkpoint_config = dict(by_epoch=False, interval=20000)
-evaluation = dict(interval=100, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_SJY/2_测试416'
-gpu_ids = [1]
+runner = dict(type='IterBasedRunner', max_iters=120000)
+checkpoint_config = dict(by_epoch=False, interval=10000)
+evaluation = dict(interval=10000, metric=['mIoU', 'mFscore'], pre_eval=True)
+work_dir = './work_SJY/4_颜色191数据集SJY4'
+gpu_ids = [7]
 auto_resume = False
