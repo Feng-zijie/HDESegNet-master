@@ -7,7 +7,7 @@ crop_size = (416,416)
 train_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(type='LoadAnnotations', reduce_zero_label=False),
-    dict(type='Resize', img_scale=(1024, 1024), ratio_range=(0.5, 2.0)),
+    dict(type='Resize', img_scale=(2048, 2048), ratio_range=(0.5, 2.0)),
     dict(type='RandomCrop', crop_size=crop_size, cat_max_ratio=0.75),
     dict(type='RandomFlip', prob=0.5),
     dict(type='PhotoMetricDistortion'),
@@ -35,15 +35,15 @@ data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
     train=dict(
-        type='RepeatDataset',
+        type='RepeatDataset', # 将原始数据集重复 times 次，伪造一个更大的数据集，避免训练过程中频繁重启数据加载（epoch切换）造成效率下降。 
         times=50,
         dataset=dict(
             type=dataset_type,
             data_root=data_root,
             img_dir='images/training',
             ann_dir='ternary_annotations/training',
-            pipeline=train_pipeline)),
-    val=dict(
+            pipeline=train_pipeline)),  # 表示使用什么pipeline进行数据预处理
+    val=dict( 
         type=dataset_type,
         data_root=data_root,
         img_dir='images/validation',

@@ -1,6 +1,5 @@
-# dataset settings
-dataset_type = 'SurfaceWaterDataset'
-data_root = '/home/wangzhecheng/Fengzijie/dataset_splited_SW'
+dataset_type = 'SWDataset'
+data_root = '/home/wangzhecheng/Fengzijie/data/Splited_SW'
 img_norm_cfg = dict(
     mean=[123.675, 116.28, 103.53], std=[58.395, 57.12, 57.375], to_rgb=True)
 crop_size = (256, 256)
@@ -16,6 +15,8 @@ train_pipeline = [
     dict(type='DefaultFormatBundle'),
     dict(type='Collect', keys=['img', 'gt_semantic_seg']),
 ]
+
+
 test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
@@ -32,6 +33,7 @@ test_pipeline = [
             dict(type='Collect', keys=['img']),
         ])
 ]
+
 data = dict(
     samples_per_gpu=4,
     workers_per_gpu=4,
@@ -42,17 +44,17 @@ data = dict(
             type=dataset_type,
             data_root=data_root,
             img_dir='images/training',
-            ann_dir='annotations/training',
+            ann_dir='binary_annotations/training',
             pipeline=train_pipeline)),
     val=dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='images/validation',
-        ann_dir='annotations/validation',
+        ann_dir='binary_annotations/validation',
         pipeline=test_pipeline),
     test=dict(
         type=dataset_type,
         data_root=data_root,
         img_dir='images/validation',
-        ann_dir='annotations/validation',
+        ann_dir='binary_annotations/validation',
         pipeline=test_pipeline))

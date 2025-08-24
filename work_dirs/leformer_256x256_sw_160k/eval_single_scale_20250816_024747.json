@@ -1,0 +1,12 @@
+{
+    "config": "local_configs/leformer/leformer_256x256_sw_160k.py",
+    "metric": {
+        "aAcc": 0.6433,
+        "mIoU": 0.32159999999999994,
+        "mAcc": 0.5,
+        "IoU.background": 0.6433000183105468,
+        "IoU.lake": 0.0,
+        "Acc.background": 1.0,
+        "Acc.lake": 0.0
+    }
+}

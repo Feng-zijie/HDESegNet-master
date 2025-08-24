@@ -378,52 +378,6 @@ class MLLA(nn.Module):
             
         return x
 
-
-class ChannelGate(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16):
-        super(ChannelGate, self).__init__()
-        self.gate_channels = gate_channels
-        self.mlp = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(gate_channels, gate_channels // reduction_ratio),
-            nn.ReLU(),
-            nn.Linear(gate_channels // reduction_ratio, gate_channels)
-        )
-
-    def forward(self, x):
-        avg_out = self.mlp(F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))).unsqueeze(-1).unsqueeze(-1)
-        max_out = self.mlp(F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))).unsqueeze(-1).unsqueeze(-1)
-        channel_att_sum = avg_out + max_out
-
-        scale = torch.sigmoid(channel_att_sum).expand_as(x)
-        return x * scale
-
-
-
-class SpatialGate(nn.Module):
-    def __init__(self):
-        super(SpatialGate, self).__init__()
-        kernel_size = 7
-        self.spatial = nn.Conv2d(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2)
-
-    def forward(self, x):
-        x_compress = torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
-        x_out = self.spatial(x_compress)
-        scale = torch.sigmoid(x_out)  # broadcasting
-        return x * scale
-
-
-class CBAM(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16):
-        super(CBAM, self).__init__()
-        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio)
-        self.SpatialGate = SpatialGate()
-
-    def forward(self, x):
-        x_out = self.ChannelGate(x)
-        x_out = self.SpatialGate(x_out)
-        return x_out
-
 # MDFA的空间和通道注意力模块
 class tongdao(nn.Module):  #处理通道部分   函数名就是拼音名称
     # 通道模块初始化，输入通道数为in_channel
@@ -522,55 +476,6 @@ class MDFA(nn.Module):  # 多尺度空洞融合注意力模块
         result = self.conv_cat(larry_feature_cat)
         return result
 
-# Edge-Guided Attention Module
-class EGA(nn.Module):
-    def __init__(self, in_channels):
-        super(EGA, self).__init__()
-    
-        self.fusion_conv = nn.Sequential(
-            nn.Conv2d(in_channels * 3, in_channels, 3, 1, 1),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True))
-
-        self.attention = nn.Sequential(
-            nn.Conv2d(in_channels, 1, 3, 1, 1),
-            nn.BatchNorm2d(1),
-            nn.Sigmoid())
-
-        self.cbam = CBAM(in_channels)
-        self.mdfa_block = MDFA(dim_in=in_channels, dim_out=in_channels)
-        self.pred_conv = nn.Conv2d(in_channels, 1, kernel_size=3, stride=1, padding=1)  # 用于生成 pred
-
-    def forward(self, edge_feature, x):
-        residual = x
-        xsize = x.size()[2:]
-
-        pred = torch.sigmoid(self.pred_conv(x))
-
-        # reverse attention
-        background_att = 1 - pred
-        background_x = x * background_att
-
-        # boudary attention
-        edge_pred = make_laplace(pred, 1)
-        pred_feature = x * edge_pred
-
-        # high-frequency feature
-        edge_input = F.interpolate(edge_feature, size=xsize, mode='bilinear', align_corners=True)
-        input_feature = x * edge_input
-
-        fusion_feature = torch.cat([background_x, pred_feature, input_feature], dim=1)
-        fusion_feature = self.fusion_conv(fusion_feature)
-
-        attention_map = self.attention(fusion_feature)
-        fusion_feature = fusion_feature * attention_map
-
-        out = fusion_feature + residual
-              
-        out = self.mdfa_block(out)
-     
-        return out
-
 class CnnEncoderLayer(BaseModule):
     """Implements one cnn encoder layer in LEFormer.
 
@@ -616,7 +521,7 @@ class CnnEncoderLayer(BaseModule):
                                           act_cfg=dict(type='GELU'),
                                           ffn_drop=ffn_drop)
         
-        self.ega_block = EGA(output_channels)
+        self.mdfa_block = MDFA(dim_in=output_channels, dim_out=output_channels)
 
     def forward(self, x):
 
@@ -628,60 +533,82 @@ class CnnEncoderLayer(BaseModule):
 
         out = self.layers(x)
         
-        
-        # out = self.multiscale_cbam(out) # 经过后 [16, 32, 64, 64] -> [16, 64, 32, 32] -> [16, 160, 16, 16] -> [16, 192, 8, 8]
-        edge_feature = make_laplace(out, channels=self.output_channels)
-        out = self.ega_block(edge_feature,out)
+        out = self.mdfa_block(out)
         
         return out
 
-# cross 变体
-class DenseLayer(nn.Module):
-    """Dense Block 内部的一层"""
-    def __init__(self, in_channels, growth_rate):
-        super(DenseLayer, self).__init__()
-        self.bn1 = nn.BatchNorm2d(in_channels)
-        self.conv1 = nn.Conv2d(in_channels, 4 * growth_rate, kernel_size=1, bias=True)
-        
-        self.bn2 = nn.BatchNorm2d(4 * growth_rate)
-        self.conv2 = nn.Conv2d(4 * growth_rate, growth_rate, kernel_size=3, padding=1, bias=True)
+"""ResNet融合模块"""
+class FeaturePyramidFusion(nn.Module):
+    def __init__(self, proj_channels=256, num_levels=4):
+        super(FeaturePyramidFusion, self).__init__()
+        # 类似于ResNet的pyramid_conv和extra_conv，用于投影到统一通道
+        # 假设有num_levels层，这里创建ModuleList，但实际使用时根据输入动态
+        self.proj_convs = nn.ModuleList([
+            nn.Conv2d(proj_channels, proj_channels, kernel_size=1, bias=False)  # 可根据实际通道调整
+            for _ in range(num_levels)
+        ])
+        self.extra_conv = nn.Conv2d(proj_channels, proj_channels, kernel_size=1, bias=False)  # 额外卷积，类似于ResNet
 
-    def forward(self, x):
-        out = self.conv1(F.relu(self.bn1(x)))
-        out = self.conv2(F.relu(self.bn2(out)))
-        return torch.cat([x, out], dim=1)  # 维度拼接，增加通道数
+    def forward(self, global_features, local_features):
+        # 假设global_features和local_features是当前层的（或列表）
+        # 如果是单层：global_features是transformer x (全局)，local_features是cnn_encoder_out (局部)
+        # 核心逻辑：投影 -> 上采样全局加到局部 -> 可选降采样 -> 最终加和融合
 
-class DenseBlock(nn.Module):
-    """包含多个 DenseLayer,并使用 1x1 卷积降维"""
-    def __init__(self, num_layers, in_channels, growth_rate, out_channels):
-        super(DenseBlock, self).__init__()
-        self.layers = nn.ModuleList()
-        current_channels = in_channels  # 记录当前通道数
-        
-        for _ in range(num_layers):
-            self.layers.append(DenseLayer(current_channels, growth_rate))
-            current_channels += growth_rate  # 每层增加 growth_rate 个通道
-        
-        # 使用 1x1 卷积降维到目标通道数
-        self.conv1x1 = nn.Conv2d(current_channels, out_channels, kernel_size=1, bias=True)
-        self.bn = nn.BatchNorm2d(out_channels)
+        # 如果是单个tensor，转为list
+        if not isinstance(global_features, list):
+            global_features = [global_features]
+        if not isinstance(local_features, list):
+            local_features = [local_features]
 
-    def forward(self, x):
-        for layer in self.layers:
-            x = layer(x)  # 逐层拼接
-        x = self.conv1x1(x)  # 1x1 降维
-        x = F.relu(self.bn(x))  # BN + ReLU
-        return x
+        # 投影到统一通道（类似于ResNet的p4, p3, p2, p1）
+        projected = []
+        for i, (g, l) in enumerate(zip(global_features, local_features)):
+            # 投影全局和局部
+            p_g = self.proj_convs[i](g) if g.shape[1] != self.proj_convs[i].in_channels else g  # 动态检查通道
+            p_l = self.proj_convs[(i+1) % len(self.proj_convs)](l) if l.shape[1] != self.proj_convs[i].in_channels else l
+            
+            # 调整分辨率：如果全局分辨率 != 局部，上采样全局到局部大小（类似于ResNet interpolate）
+            if p_g.shape[2:] != p_l.shape[2:]:
+                p_g = F.interpolate(p_g, size=p_l.shape[2:], mode='nearest')
+
+            # top-down融合：全局加到局部（类似于ResNet p3 = p3 + interpolate(p4)）
+            fused_level = p_l + p_g
+            projected.append(fused_level)
+
+        # 如果有多层，模拟ResNet的多尺度融合：从高层到低层上采样加和
+        if len(projected) > 1:
+            for j in range(len(projected)-2, -1, -1):  # 从高层到低层
+                upsampled = F.interpolate(projected[j+1], scale_factor=2, mode='nearest')
+                if projected[j].shape[2:] != upsampled.shape[2:]:
+                    upsampled = F.interpolate(upsampled, size=projected[j].shape[2:], mode='nearest')
+                projected[j] = projected[j] + upsampled
+
+            # 可选降采样（类似于ResNet的p2降采样）
+            projected[0] = F.interpolate(projected[0], scale_factor=0.5, mode='nearest')
+
+        # 最终融合所有尺度（类似于ResNet fused_feature = p1 + p2 + p3 + ...）
+        # 确保分辨率一致后加和
+        fused_feature = projected[0]
+        for p in projected[1:]:
+            p_resized = F.interpolate(p, size=fused_feature.shape[2:], mode='nearest')
+            fused_feature = fused_feature + p_resized
+
+        # 额外卷积处理（类似于ResNet的extra_conv）
+        fused_feature = self.extra_conv(fused_feature)
+
+        return fused_feature
+
 
 class CrossEncoderFusion(nn.Module):
     def __init__(self, fusion_out_channels):
         super(CrossEncoderFusion, self).__init__()
         
         self.fusion_blocks = nn.ModuleList([
-            DenseBlock(num_layers, in_channels, growth_rate, out_channels) 
+            FeaturePyramidFusion(proj_channels=out_channels, num_levels=num_layers) 
             for in_channels, growth_rate, num_layers, out_channels in fusion_out_channels
         ])
-
+        
+        
     def forward(self, x, cnn_encoder_layers, transformer_encoder_layers, out_indices):
         outs = []
         cnn_encoder_out = x
@@ -708,12 +635,9 @@ class CrossEncoderFusion(nn.Module):
             x = transformer_encoder_layer[2](x)
             x = nlc_to_nchw(x, hw_shape)
 
-            # 拼接 CNN 和 Transformer 特征
-            fusion_input = torch.cat((cnn_encoder_out, x), dim=1)
-
             # 经过 DenseBlock 进行融合
-            x = self.fusion_blocks[i](fusion_input)
-
+            x = self.fusion_blocks[i](cnn_encoder_out,x)
+        
             if i in out_indices:
                 outs.append(x)
 
@@ -807,8 +731,15 @@ class LEFormer(BaseModule):
             (320, 64, 2, 160),
             (384,128, 2, 192)
         ]
+        
+        self.fusion_out_Resnet = [
+            (32, 16, 3, 32),  
+            (64, 32, 3, 64),  
+            (160, 64, 3, 160),
+            (192, 128, 3, 192)
+        ]
 
-        self.cross_encoder_fusion=CrossEncoderFusion(self.fusion_out_channels_5)
+        self.cross_encoder_fusion=CrossEncoderFusion(self.fusion_out_Resnet)
 
         assert not (init_cfg and pretrained), \
             'init_cfg and pretrained cannot be set at the same time'

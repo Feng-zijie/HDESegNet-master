@@ -19,20 +19,18 @@ from .loveda import LoveDADataset
 from .night_driving import NightDrivingDataset
 from .pascal_context import PascalContextDataset, PascalContextDataset59
 from .potsdam import PotsdamDataset
-from .stare import STAREDataset
 from .voc import PascalVOCDataset
 from .qtpl import QTPLDataset
-from .surface_water import SurfaceWaterDataset
-from .sjy import SJYDataset
+from .sw import SWDataset
 
 __all__ = [
     'CustomDataset', 'build_dataloader', 'ConcatDataset', 'RepeatDataset',
     'DATASETS', 'build_dataset', 'PIPELINES', 'CityscapesDataset',
     'PascalVOCDataset', 'ADE20KDataset', 'PascalContextDataset',
     'PascalContextDataset59', 'ChaseDB1Dataset', 'DRIVEDataset', 'HRFDataset',
-    'STAREDataset', 'DarkZurichDataset', 'NightDrivingDataset',
+    'DarkZurichDataset', 'NightDrivingDataset',
     'COCOStuffDataset', 'LoveDADataset', 'MultiImageMixDataset',
     'iSAIDDataset', 'ISPRSDataset', 'PotsdamDataset', 'FaceOccludedDataset',
     'ImageNetSDataset', 'LoadImageNetSAnnotations',
-    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SurfaceWaterDataset','SJYDataset'
+    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SWDataset',
 ]

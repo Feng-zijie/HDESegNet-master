@@ -378,98 +378,6 @@ class MLLA(nn.Module):
             
         return x
 
-
-class ChannelGate(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16):
-        super(ChannelGate, self).__init__()
-        self.gate_channels = gate_channels
-        self.mlp = nn.Sequential(
-            nn.Flatten(),
-            nn.Linear(gate_channels, gate_channels // reduction_ratio),
-            nn.ReLU(),
-            nn.Linear(gate_channels // reduction_ratio, gate_channels)
-        )
-
-    def forward(self, x):
-        avg_out = self.mlp(F.avg_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))).unsqueeze(-1).unsqueeze(-1)
-        max_out = self.mlp(F.max_pool2d(x, (x.size(2), x.size(3)), stride=(x.size(2), x.size(3)))).unsqueeze(-1).unsqueeze(-1)
-        channel_att_sum = avg_out + max_out
-
-        scale = torch.sigmoid(channel_att_sum).expand_as(x)
-        return x * scale
-
-
-
-class SpatialGate(nn.Module):
-    def __init__(self):
-        super(SpatialGate, self).__init__()
-        kernel_size = 7
-        self.spatial = nn.Conv2d(2, 1, kernel_size, stride=1, padding=(kernel_size - 1) // 2)
-
-    def forward(self, x):
-        x_compress = torch.cat((torch.max(x, 1)[0].unsqueeze(1), torch.mean(x, 1).unsqueeze(1)), dim=1)
-        x_out = self.spatial(x_compress)
-        scale = torch.sigmoid(x_out)  # broadcasting
-        return x * scale
-
-
-class CBAM(nn.Module):
-    def __init__(self, gate_channels, reduction_ratio=16):
-        super(CBAM, self).__init__()
-        self.ChannelGate = ChannelGate(gate_channels, reduction_ratio)
-        self.SpatialGate = SpatialGate()
-
-    def forward(self, x):
-        x_out = self.ChannelGate(x)
-        x_out = self.SpatialGate(x_out)
-        return x_out
-
-# MDFA的空间和通道注意力模块
-class tongdao(nn.Module):  #处理通道部分   函数名就是拼音名称
-    # 通道模块初始化，输入通道数为in_channel
-    def __init__(self, in_channel):
-        super().__init__()
-        self.avg_pool = nn.AdaptiveAvgPool2d(1)  # 自适应平均池化，输出大小为1x1
-        self.fc = nn.Conv2d(in_channel, 1, kernel_size=1, bias=True)  # 1x1卷积用于降维
-        self.relu = nn.ReLU(inplace=False)  # ReLU激活函数，就地操作以节省内存
-
-    # 前向传播函数
-    def forward(self, x):
-        b, c, _, _ = x.size()  # 提取批次大小和通道数
-        y = self.avg_pool(x)  # 应用自适应平均池化
-        y = self.fc(y)  # 应用1x1卷积
-        y = self.relu(y)  # 应用ReLU激活
-        y = nn.functional.interpolate(y, size=(x.size(2), x.size(3)), mode='nearest')  # 调整y的大小以匹配x的空间维度
-        return x * y.expand_as(x)  # 将计算得到的通道权重应用到输入x上，实现特征重校准
-
-class kongjian(nn.Module):
-    # 空间模块初始化，输入通道数为in_channel
-    def __init__(self, in_channel):
-        super().__init__()
-        self.Conv1x1 = nn.Conv2d(in_channel, 1, kernel_size=1, bias=True)  # 1x1卷积用于产生空间激励
-        self.norm = nn.Sigmoid()  # Sigmoid函数用于归一化
-
-    # 前向传播函数
-    def forward(self, x):
-        y = self.Conv1x1(x)  # 应用1x1卷积
-        y = self.norm(y)  # 应用Sigmoid函数
-        return x * y  # 将空间权重应用到输入x上，实现空间激励
-
-class hebing(nn.Module):    #函数名为合并, 意思是把空间和通道分别提取的特征合并起来
-    # 合并模块初始化，输入通道数为in_channel
-    def __init__(self, in_channel):
-        super().__init__()
-        self.tongdao = tongdao(in_channel)  # 创建通道子模块
-        self.kongjian = kongjian(in_channel)  # 创建空间子模块
-
-    # 前向传播函数
-    def forward(self, U):
-        U_kongjian = self.kongjian(U)  # 通过空间模块处理输入U
-        U_tongdao = self.tongdao(U)  # 通过通道模块处理输入U
-        return torch.max(U_tongdao, U_kongjian)  # 取两者的逐元素最大值，结合通道和空间激励
-
-
-# 修改所有 ReLU 的 inplace 参数为 False
 class MDFA(nn.Module):  # 多尺度空洞融合注意力模块
     def __init__(self, dim_in, dim_out, rate=1, bn_mom=0.1):
         super(MDFA, self).__init__()
@@ -502,7 +410,6 @@ class MDFA(nn.Module):  # 多尺度空洞融合注意力模块
             nn.BatchNorm2d(dim_out, momentum=bn_mom),
             nn.ReLU(inplace=False),
         )
-        self.Hebing = hebing(in_channel=dim_out * 5)
 
     def forward(self, x):
         [b, c, row, col] = x.size()
@@ -516,60 +423,111 @@ class MDFA(nn.Module):  # 多尺度空洞融合注意力模块
         global_feature = self.branch5_bn(global_feature)
         global_feature = self.branch5_relu(global_feature)
         global_feature = F.interpolate(global_feature, (row, col), None, 'bilinear', True)
-        feature_cat = torch.cat([conv1x1, conv3x3_1, conv3x3_2, conv3x3_3, global_feature], dim=1)
-        larry = self.Hebing(feature_cat)
-        larry_feature_cat = larry * feature_cat
-        result = self.conv_cat(larry_feature_cat)
+        result = torch.cat([conv1x1, conv3x3_1, conv3x3_2, conv3x3_3, global_feature], dim=1)
+        
         return result
 
-# Edge-Guided Attention Module
-class EGA(nn.Module):
-    def __init__(self, in_channels):
-        super(EGA, self).__init__()
-    
-        self.fusion_conv = nn.Sequential(
-            nn.Conv2d(in_channels * 3, in_channels, 3, 1, 1),
-            nn.BatchNorm2d(in_channels),
-            nn.ReLU(inplace=True))
+def global_median_pooling(x):  #对输入特征图进行全局中值池化操作。
 
-        self.attention = nn.Sequential(
-            nn.Conv2d(in_channels, 1, 3, 1, 1),
-            nn.BatchNorm2d(1),
-            nn.Sigmoid())
+    median_pooled = torch.median(x.view(x.size(0), x.size(1), -1), dim=2)[0]
+    median_pooled = median_pooled.view(x.size(0), x.size(1), 1, 1)
+    return median_pooled #全局中值池化后的特征图，尺寸为 (batch_size, channels, 1, 1)
 
-        self.cbam = CBAM(in_channels)
-        self.mdfa_block = MDFA(dim_in=in_channels, dim_out=in_channels)
-        self.pred_conv = nn.Conv2d(in_channels, 1, kernel_size=3, stride=1, padding=1)  # 用于生成 pred
 
-    def forward(self, edge_feature, x):
-        residual = x
-        xsize = x.size()[2:]
+class ChannelAttention(nn.Module):
+    def __init__(self, input_channels, internal_neurons):
+        super(ChannelAttention, self).__init__()
+        # 定义两个 1x1 卷积层，用于减少和恢复特征维度
+        self.fc1 = nn.Conv2d(in_channels=input_channels, out_channels=internal_neurons, kernel_size=1, stride=1,
+                             bias=True)
+        self.fc2 = nn.Conv2d(in_channels=internal_neurons, out_channels=input_channels, kernel_size=1, stride=1,
+                             bias=True)
+        self.input_channels = input_channels
 
-        pred = torch.sigmoid(self.pred_conv(x))
+    def forward(self, inputs):
+        avg_pool = F.adaptive_avg_pool2d(inputs, output_size=(1, 1)) # 全局平均池化
+        max_pool = F.adaptive_max_pool2d(inputs, output_size=(1, 1))# 全局最大池化
+        median_pool = global_median_pooling(inputs)# 全局中值池化
 
-        # reverse attention
-        background_att = 1 - pred
-        background_x = x * background_att
+        # 处理全局平均池化后的输出
+        avg_out = self.fc1(avg_pool)# 通过第一个 1x1 卷积层减少特征维度
+        avg_out = F.relu(avg_out, inplace=True) # 应用 ReLU 激活函数
+        avg_out = self.fc2(avg_out)# 通过第二个 1x1 卷积层恢复特征维度
+        avg_out = torch.sigmoid(avg_out) # 使用 Sigmoid 激活函数，将输出值压缩到 [0, 1] 范围内
 
-        # boudary attention
-        edge_pred = make_laplace(pred, 1)
-        pred_feature = x * edge_pred
+        # 处理全局最大池化后的输出
+        max_out = self.fc1(max_pool)# 通过第一个 1x1 卷积层减少特征维度
+        max_out = F.relu(max_out, inplace=True) # 应用 ReLU 激活函数
+        max_out = self.fc2(max_out) # 通过第二个 1x1 卷积层恢复特征维度
+        max_out = torch.sigmoid(max_out) # 使用 Sigmoid 激活函数，将输出值压缩到 [0, 1] 范围内
 
-        # high-frequency feature
-        edge_input = F.interpolate(edge_feature, size=xsize, mode='bilinear', align_corners=True)
-        input_feature = x * edge_input
+        # 处理全局中值池化后的输出
+        median_out = self.fc1(median_pool) # 通过第一个 1x1 卷积层减少特征维度
+        median_out = F.relu(median_out, inplace=True) # 应用 ReLU 激活函数
+        median_out = self.fc2(median_out) # 通过第二个 1x1 卷积层恢复特征维度
+        median_out = torch.sigmoid(median_out) # 使用 Sigmoid 激活函数，将输出值压缩到 [0, 1] 范围内
 
-        fusion_feature = torch.cat([background_x, pred_feature, input_feature], dim=1)
-        fusion_feature = self.fusion_conv(fusion_feature)
-
-        attention_map = self.attention(fusion_feature)
-        fusion_feature = fusion_feature * attention_map
-
-        out = fusion_feature + residual
-              
-        out = self.mdfa_block(out)
-     
+        # 将三个池化结果的注意力图进行元素级相加
+        out = avg_out + max_out + median_out
         return out
+
+
+class MECS(nn.Module):
+    def __init__(self, in_channels, out_channels, channel_attention_reduce=4):
+        super(MECS , self).__init__()
+
+        self.C = in_channels
+        self.O = out_channels
+        # 确保输入和输出通道数相同
+        assert in_channels == out_channels, "Input and output channels must be the same"
+        # 初始化通道注意力模块
+        self.channel_attention = ChannelAttention(input_channels=in_channels,
+                                                  internal_neurons=in_channels // channel_attention_reduce)
+
+        # 定义 5x5 深度卷积层
+        self.initial_depth_conv = nn.Conv2d(in_channels, in_channels, kernel_size=5, padding=2, groups=in_channels)
+
+        # 定义多个不同尺寸的深度卷积层
+        self.depth_convs = nn.ModuleList([
+
+            nn.Conv2d(in_channels, in_channels, kernel_size=(1, 7), padding=(0, 3), groups=in_channels),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(7, 1), padding=(3, 0), groups=in_channels),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(1, 11), padding=(0, 5), groups=in_channels),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(11, 1), padding=(5, 0), groups=in_channels),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(1, 21), padding=(0, 10), groups=in_channels),
+            nn.Conv2d(in_channels, in_channels, kernel_size=(21, 1), padding=(10, 0), groups=in_channels),
+        ])
+        # 定义 1x1 卷积层和激活函数
+        self.pointwise_conv = nn.Conv2d(5*in_channels, in_channels, kernel_size=1, padding=0)
+        self.pointwise_conv2 = nn.Conv2d(in_channels, in_channels, kernel_size=1, padding=0)
+        self.act = nn.GELU()
+        self.mdfa_block=MDFA(dim_in=in_channels, dim_out=out_channels)
+
+    def forward(self, inputs):
+        
+        inputs = self.mdfa_block(inputs)  # 应用多尺度空洞融合注意力模块
+        # 全局感知机
+        inputs = self.pointwise_conv(inputs)
+        
+        inputs = self.act(inputs)
+
+        # 通道注意力
+        channel_att_vec = self.channel_attention(inputs)
+        inputs = channel_att_vec * inputs
+
+        # 先经过 5x5 深度卷积层
+        initial_out = self.initial_depth_conv(inputs)
+
+        # 空间注意力
+        spatial_outs = [conv(initial_out) for conv in self.depth_convs]
+        spatial_out = sum(spatial_outs)
+
+        # 应用空间注意力
+        spatial_att = self.pointwise_conv2(spatial_out)
+        out = spatial_att * inputs
+        out = self.pointwise_conv2(out)
+        return out
+
 
 class CnnEncoderLayer(BaseModule):
     """Implements one cnn encoder layer in LEFormer.
@@ -615,24 +573,17 @@ class CnnEncoderLayer(BaseModule):
                                           padding=padding,
                                           act_cfg=dict(type='GELU'),
                                           ffn_drop=ffn_drop)
+
+        self.norm = nn.BatchNorm2d(output_channels)
         
-        self.ega_block = EGA(output_channels)
+        self.mdfa_mecs_block = MECS (in_channels=output_channels, out_channels=output_channels, channel_attention_reduce=4)
 
     def forward(self, x):
 
-        # self.embed_dims => 3, 32, 64, 160   # self.output_channels => 32, 64, 160, 192
-        # 第一次 x[16, 3, 256, 256] -> out1[16, 32, 64, 64] -> out2[16, 32, 64, 64]
-        # 第二次 x[16, 32, 64, 64] -> out1[16, 64, 32, 32] -> out2[16, 64, 32, 32]
-        # 第三次 x[16, 64, 32, 32] -> out1[16, 160, 16, 16] -> out2[16, 160, 16, 16]
-        # 第四次 x[16, 160, 16, 16] -> out1[16, 192, 8, 8] -> out2[16, 192, 8, 8]
-
         out = self.layers(x)
         
-        
-        # out = self.multiscale_cbam(out) # 经过后 [16, 32, 64, 64] -> [16, 64, 32, 32] -> [16, 160, 16, 16] -> [16, 192, 8, 8]
-        edge_feature = make_laplace(out, channels=self.output_channels)
-        out = self.ega_block(edge_feature,out)
-        
+        out = self.mdfa_mecs_block(out)
+
         return out
 
 # cross 变体
@@ -850,7 +801,6 @@ class LEFormer(BaseModule):
                 norm_cfg=norm_cfg)
             feedforward_channels_list.append(mlp_ratio * embed_dims_i)
 
-            
             if embed_dims_i==32:
                 self.input_resolution=(64,64)
             elif embed_dims_i==64:

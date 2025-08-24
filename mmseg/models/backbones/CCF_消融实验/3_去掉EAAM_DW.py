@@ -455,6 +455,7 @@ class CnnEncoderLayer(BaseModule):
             identity = F.interpolate(identity, size=out.shape[2:], mode='bilinear', align_corners=False)
 
         out = out + identity
+        
         out = F.relu(out)
         return out
 
