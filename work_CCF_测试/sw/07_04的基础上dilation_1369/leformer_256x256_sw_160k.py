@@ -178,5 +178,5 @@ runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
 work_dir = './work_CCF_测试/sw/07_04的基础上dilation_1369'
-gpu_ids = [4]
+gpu_ids = [5]
 auto_resume = False

@@ -385,6 +385,8 @@ def global_median_pooling(x):  #对输入特征图进行全局中值池化操作
     median_pooled = median_pooled.view(x.size(0), x.size(1), 1, 1)
     return median_pooled #全局中值池化后的特征图，尺寸为 (batch_size, channels, 1, 1)
 
+
+"""MECS的通道注意力"""
 class ChannelAttention(nn.Module):
     def __init__(self, input_channels, internal_neurons):
         super(ChannelAttention, self).__init__()
@@ -478,18 +480,18 @@ class MDFA(nn.Module):
             nn.BatchNorm2d(dim_out, momentum=bn_mom),
             nn.ReLU(inplace=True),
         )
-        self.branch2 = nn.Sequential( # 第二分支：使用3x3卷积，空洞率为6，可以增加感受野
+        self.branch2 = nn.Sequential( # 第二分支：使用3x3卷积，空洞率为3，可以增加感受野
+            nn.Conv2d(dim_in, dim_out, 3, 1, padding=3 * rate, dilation=3 * rate, bias=True),
+            nn.BatchNorm2d(dim_out, momentum=bn_mom),
+            nn.ReLU(inplace=True),
+        )
+        self.branch3 = nn.Sequential( # 第三分支：使用3x3卷积，空洞率为6，进一步增加感受野
             nn.Conv2d(dim_in, dim_out, 3, 1, padding=6 * rate, dilation=6 * rate, bias=True),
             nn.BatchNorm2d(dim_out, momentum=bn_mom),
             nn.ReLU(inplace=True),
         )
-        self.branch3 = nn.Sequential( # 第三分支：使用3x3卷积，空洞率为12，进一步增加感受野
-            nn.Conv2d(dim_in, dim_out, 3, 1, padding=12 * rate, dilation=12 * rate, bias=True),
-            nn.BatchNorm2d(dim_out, momentum=bn_mom),
-            nn.ReLU(inplace=True),
-        )
-        self.branch4 = nn.Sequential(# 第四分支：使用3x3卷积，空洞率为18，最大化感受野的扩展
-            nn.Conv2d(dim_in, dim_out, 3, 1, padding=18 * rate, dilation=18 * rate, bias=True),
+        self.branch4 = nn.Sequential(# 第四分支：使用3x3卷积，空洞率为9，最大化感受野的扩展
+            nn.Conv2d(dim_in, dim_out, 3, 1, padding=9 * rate, dilation=9 * rate, bias=True),
             nn.BatchNorm2d(dim_out, momentum=bn_mom),
             nn.ReLU(inplace=True),
         )
