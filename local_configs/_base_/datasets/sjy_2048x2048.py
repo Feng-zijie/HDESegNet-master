@@ -20,7 +20,8 @@ test_pipeline = [
     dict(type='LoadImageFromFile'),
     dict(
         type='MultiScaleFlipAug',
-        img_scale=(2048, 2048),  # 滑动窗口时候  img_scale=None
+        img_scale=(2048, 2048),  # 滑动窗口时候  img_scale=None,
+        # img_scale=None,
         # img_ratios=[0.5, 0.75, 1.0, 1.25, 1.5, 1.75],
         flip=False,
         transforms=[

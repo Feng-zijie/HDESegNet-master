@@ -3,12 +3,13 @@ from .custom import CustomDataset
 
 
 @DATASETS.register_module()
-class SWDataset(CustomDataset):
-    CLASSES = ('background', 'lake')
-    PALETTE = [[0, 0, 0], [128, 0, 0]]
+class SJYDataset(CustomDataset):
+    CLASSES = ('background', 'lake','river')
+    PALETTE = [[0, 0, 0], [128, 0, 0], [0, 127, 191]]
 
     def __init__(self, **kwargs):
-        super(SWDataset, self).__init__(
+        super(SJYDataset, self).__init__(
             img_suffix='.jpg',
             seg_map_suffix='.png',
+            reduce_zero_label=False,
             **kwargs)

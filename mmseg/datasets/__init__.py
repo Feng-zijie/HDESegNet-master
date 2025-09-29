@@ -22,6 +22,7 @@ from .potsdam import PotsdamDataset
 from .voc import PascalVOCDataset
 from .qtpl import QTPLDataset
 from .sw import SWDataset
+from .sjy import SJYDataset
 
 __all__ = [
     'CustomDataset', 'build_dataloader', 'ConcatDataset', 'RepeatDataset',
@@ -32,5 +33,5 @@ __all__ = [
     'COCOStuffDataset', 'LoveDADataset', 'MultiImageMixDataset',
     'iSAIDDataset', 'ISPRSDataset', 'PotsdamDataset', 'FaceOccludedDataset',
     'ImageNetSDataset', 'LoadImageNetSAnnotations',
-    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SWDataset',
+    'LoadImageNetSImageFromFile', 'QTPLDataset', 'SWDataset','SJYDataset'
 ]
