@@ -435,17 +435,11 @@ def conv3x3(in_planes, out_planes, stride=1):
     """3x3 convolution with padding"""
     return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False)
 
-
-def conv1x1(in_planes, out_planes, stride=1):
-    """1x1 convolution"""
-    return nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=stride, bias=False)
-
-
-def convdilated(in_planes, out_planes, kSize=3, stride=1, dilation=1):
+def convdilated(in_planes, out_planes, stride=1, dilation=1, bn_mom=0.1):
     """3x3 convolution with dilation"""
-    padding = int((kSize - 1) / 2) * dilation
-    return nn.Conv2d(in_planes, out_planes, kernel_size=kSize, stride=stride, padding=padding,
-                     dilation=dilation, bias=False)
+    padding = dilation
+    
+    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=1, padding=padding, dilation=dilation, bias=True)
 
 class SPRModule(nn.Module):
     def __init__(self, channels, reduction=8):
@@ -463,10 +457,12 @@ class SPRModule(nn.Module):
         
         
         out1 = self.avg_pool1(x).view(x.size(0), -1, 1, 1) # 变成[B, channels, 1, 1]
+        
         out2 = self.avg_pool2(x).view(x.size(0), -1, 1, 1) # 变成[B, channels×4, 1, 1]
+        
         out = torch.cat((out1, out2), 1) # 拼接后 [B, channels + channels×4, 1, 1] = [B, channels×5, 1, 1]
         # 相当于 1个全局（1×1池化）+ 4个局部（2×2池化）= 5个特征
-
+        
         out = self.fc1(out)
         out = self.relu(out)
         out = self.fc2(out)
@@ -474,8 +470,9 @@ class SPRModule(nn.Module):
 
         return weight
     
+
 class MSPAModule(nn.Module):
-    def __init__(self, inplanes, scale=4, stride=1, stype='normal'):
+    def __init__(self, inplanes, scale=3, stride=1, bn_mom=0.1, stype='stage'):
         """ Constructor
         Args:
             inplanes: input channel dimensionality.
@@ -493,23 +490,32 @@ class MSPAModule(nn.Module):
 
         self.convs = nn.ModuleList([])
         self.bns = nn.ModuleList([])
+        self.relu = nn.ModuleList([])
 
         for i in range(self.nums):
-            if self.stype == 'stage' and self.stride != 1:
-                self.convs.append(convdilated(self.width, self.width, stride=stride, dilation=int(i + 1)))
-            else:
-                self.convs.append(conv3x3(self.width, self.width, stride))
+            self.convs.append(convdilated(self.width, self.width, stride=stride, dilation=int((i+1)*3)))
 
             self.bns.append(nn.BatchNorm2d(self.width))
-
-        self.attention = SPRModule(self.width)
-
-        self.softmax = nn.Softmax(dim=1)
+            self.relu.append(nn.ReLU(inplace=True))
+        
+        
+        self.attention = SPRModule(inplanes * scale)
+        
+        self.pool_conv = nn.Conv2d(inplanes*scale, inplanes*scale, 1, 1, 0, bias=True) 
+        self.pool_bn = nn.BatchNorm2d(inplanes*scale, momentum=bn_mom)
+        self.pool_relu = nn.ReLU(inplace=True)    
+        
+        self.fuse_conv = nn.Conv2d(inplanes * scale * 2, inplanes * scale, 1, 1, 0, bias=False)
+        self.fuse_bn   = nn.BatchNorm2d(inplanes * scale)
+        self.fuse_relu = nn.ReLU(inplace=True)
+        
 
     def forward(self, x):
-        batch_size = x.shape[0]
+        [batch_size, c, row, col] = x.size()
+        avgpool = x
 
-        spx = torch.split(x, self.width, 1)
+        spx = torch.split(x, self.width, 1)      
+        
         for i in range(self.nums):
             if i == 0 or (self.stype == 'stage' and self.stride != 1):
                 sp = spx[i]
@@ -517,33 +523,22 @@ class MSPAModule(nn.Module):
                 sp = sp + spx[i]
             sp = self.convs[i](sp)
             sp = self.bns[i](sp)
+            sp = self.relu[i](sp)
 
             if i == 0:
                 out = sp
             else:
-                out = torch.cat((out, sp), 1)
-
-        feats = out
-        feats = feats.view(batch_size, self.nums, self.width, feats.shape[2], feats.shape[3])
-
-        sp_inp = torch.split(out, self.width, 1)
+                out = torch.cat((out, sp), 1)      
         
-        attn_weight = []
-        for inp in sp_inp:
-            attn_weight.append(self.attention(inp))
-
-        attn_weight = torch.cat(attn_weight, dim=1)
-        attn_vectors = attn_weight.view(batch_size, self.nums, self.width, 1, 1)
-        attn_vectors = self.softmax(attn_vectors)
-        feats_weight = feats * attn_vectors
-
-        for i in range(self.nums):
-            x_attn_weight = feats_weight[:, i, :, :, :]
-            if i == 0:
-                out = x_attn_weight
-            else:
-                out = torch.cat((out, x_attn_weight), 1)
-                
+        globalpool_feature = self.attention(avgpool)
+        
+        
+        globalpool_feature = F.interpolate(globalpool_feature, (row, col), None, 'bilinear', True)
+        
+        out = torch.cat((out,globalpool_feature),1)
+        
+        out = self.fuse_relu(self.fuse_bn(self.fuse_conv(out)))
+        
         return out
 
 
@@ -914,13 +909,13 @@ class LEFormer(BaseModule):
 
             
             if embed_dims_i==32:
-                self.input_resolution=(64,64)
+                self.input_resolution=(104,104)
             elif embed_dims_i==64:
-                self.input_resolution=(32,32)
+                self.input_resolution=(52,52)
             elif embed_dims_i==96:
-                self.input_resolution=(16,16)
+                self.input_resolution=(26,26)
             elif embed_dims_i==128:
-                self.input_resolution=(8,8)
+                self.input_resolution=(13,13)
                 
             layer = ModuleList([
                 MLLA(

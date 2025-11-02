@@ -177,6 +177,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
-gpu_ids = [7]
+work_dir = './work_日常论文/sw/15_在12的基础将传入融合模块的小波继续传入下一小波层'
+gpu_ids = [6]
 auto_resume = False

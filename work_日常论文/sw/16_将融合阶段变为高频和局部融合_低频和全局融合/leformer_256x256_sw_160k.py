@@ -177,6 +177,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
-gpu_ids = [7]
+work_dir = './work_日常论文/sw/16_将融合阶段变为高频和局部融合_低频和全局融合'
+gpu_ids = [5]
 auto_resume = False

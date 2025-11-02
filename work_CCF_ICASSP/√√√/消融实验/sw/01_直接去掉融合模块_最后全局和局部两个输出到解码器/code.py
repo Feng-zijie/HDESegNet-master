@@ -766,6 +766,7 @@ class CrossEncoderFusion(nn.Module):
                 outs.append(trans_encoder_out)
         
         if len(outs) > 1:
+            
             dense_out = self.dense_fusion(outs)
             
             return dense_out

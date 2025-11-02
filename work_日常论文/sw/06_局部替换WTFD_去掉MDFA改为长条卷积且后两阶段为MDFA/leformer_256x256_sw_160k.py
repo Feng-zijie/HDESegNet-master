@@ -177,6 +177,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
+work_dir = './work_日常论文/sw/06_局部替换WTFD_去掉MDFA改为长条卷积且后两阶段为MDFA'
 gpu_ids = [7]
 auto_resume = False

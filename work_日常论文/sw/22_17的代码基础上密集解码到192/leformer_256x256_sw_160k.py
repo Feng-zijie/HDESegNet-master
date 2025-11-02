@@ -8,19 +8,20 @@ model = dict(
         embed_dims=32,
         num_stages=4,
         num_layers=[2, 2, 2, 2],
-        num_heads=[1, 2, 3, 4],
+        num_heads=[1, 2, 5, 6],
         patch_sizes=[7, 3, 3, 3],
         strides=[4, 2, 2, 2],
+        dwt_strides=[2, 1, 1, 1],
         sr_ratios=[8, 4, 2, 1],
-        out_indices=(3, ),
+        out_indices=(0, 1, 2, 3),
         mlp_ratio=4,
         drop_rate=0.0,
         ffn_classes=1),
     decode_head=dict(
         type='SegformerHead',
-        in_channels=[128],
+        in_channels=[192],
         in_index=[0],
-        channels=128,
+        channels=192,
         dropout_ratio=0.1,
         num_classes=2,
         norm_cfg=dict(type='BN', requires_grad=True),
@@ -177,6 +178,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
-gpu_ids = [7]
+work_dir = './work_日常论文/sw/22_17的代码基础上密集解码到192'
+gpu_ids = [6]
 auto_resume = False

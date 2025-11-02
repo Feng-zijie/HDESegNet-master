@@ -177,6 +177,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
+work_dir = './work_日常论文/sw/13_不使用小波与12做对比实验'
 gpu_ids = [7]
 auto_resume = False

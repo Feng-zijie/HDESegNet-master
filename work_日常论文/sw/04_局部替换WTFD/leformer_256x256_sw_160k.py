@@ -1,4 +1,4 @@
-norm_cfg = dict(type='BN', requires_grad=True)
+norm_cfg = dict(type='SyncBN', requires_grad=True)
 model = dict(
     type='EncoderDecoder',
     pretrained=None,
@@ -10,6 +10,7 @@ model = dict(
         num_layers=[2, 2, 2, 2],
         num_heads=[1, 2, 3, 4],
         patch_sizes=[7, 3, 3, 3],
+        wtfd_strides=[2, 1, 1, 1],
         strides=[4, 2, 2, 2],
         sr_ratios=[8, 4, 2, 1],
         out_indices=(3, ),
@@ -23,12 +24,13 @@ model = dict(
         channels=128,
         dropout_ratio=0.1,
         num_classes=2,
-        norm_cfg=dict(type='BN', requires_grad=True),
+        norm_cfg=dict(type='SyncBN', requires_grad=True),
         align_corners=False,
         loss_decode=dict(
             type='CrossEntropyLoss', use_sigmoid=False, loss_weight=1.0)),
     train_cfg=dict(),
-    test_cfg=dict(mode='whole'))
+    test_cfg=dict(mode='slide', crop_size=(416, 416), stride=(256, 256)))
+find_unused_parameters = True
 dataset_type = 'SWDataset'
 data_root = '/home/wangzhecheng/Fengzijie/data/Splited_SW'
 img_norm_cfg = dict(
@@ -177,6 +179,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
-gpu_ids = [7]
+work_dir = './work_日常论文/sw/04_局部替换WTFD'
+gpu_ids = [5]
 auto_resume = False

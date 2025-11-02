@@ -509,6 +509,7 @@ class MSPAModule(nn.Module):
     def forward(self, x):
         batch_size = x.shape[0]
 
+        # 将输入张量沿通道维度拆分为 self.nums (scale)  份，每份 self.width (inplanes) 通道
         spx = torch.split(x, self.width, 1)
         for i in range(self.nums):
             if i == 0 or (self.stype == 'stage' and self.stride != 1):
@@ -592,7 +593,7 @@ class CnnEncoderLayer(BaseModule):
                                           act_cfg=dict(type='GELU'),
                                           ffn_drop=ffn_drop)
         
-        # inplans => 分为
+        # inplans => 意味着每个分支处理inplans个通道，    scale => 共scale个分支   一共是inplans*scale个通道
         self.mspa_block = MSPAModule(inplanes=output_channels // 4,scale=4)
 
     def forward(self, x):

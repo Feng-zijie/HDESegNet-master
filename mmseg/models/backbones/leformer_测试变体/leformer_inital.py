@@ -670,6 +670,7 @@ class CrossEncoderFusion(nn.Module):
 
 @BACKBONES.register_module()
 class LEFormer(BaseModule):
+    
     """The backbone of LEFormer.
 
     This backbone is the implementation of `LEFormer: Simple and

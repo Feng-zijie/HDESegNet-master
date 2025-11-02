@@ -11,6 +11,7 @@ model = dict(
         num_heads=[1, 2, 3, 4],
         patch_sizes=[7, 3, 3, 3],
         strides=[4, 2, 2, 2],
+        dwt_strides=[2, 1, 1, 1],
         sr_ratios=[8, 4, 2, 1],
         out_indices=(3, ),
         mlp_ratio=4,
@@ -177,6 +178,6 @@ lr_config = dict(
 runner = dict(type='IterBasedRunner', max_iters=240000)
 checkpoint_config = dict(by_epoch=False, interval=20000)
 evaluation = dict(interval=20000, metric=['mIoU', 'mFscore'], pre_eval=True)
-work_dir = './work_日常论文/sw/01_局部编码器变为MSPAModule'
+work_dir = './work_日常论文/sw/11_三分支局部和全局分别交叉融合后再Concat融合_32,64,96,128'
 gpu_ids = [7]
 auto_resume = False
